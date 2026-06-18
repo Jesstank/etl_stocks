@@ -1,0 +1,39 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+env/
+.venv/
+etl-env/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# OS system files
+.DS_Store
+Thumbs.db
+
+# VS Code local settings
+.vscode/
+
+# Raw and processed generated data
+data/raw/
+data/processed/
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.bak
