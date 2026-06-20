@@ -13,8 +13,6 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 SITE_DIR = BASE_DIR / "site"
 SITE_FIGURES_DIR = SITE_DIR / "figures"
 
-SUMMARY_PATH = REPORTS_DIR / "ticker_summary.csv"
-
 
 def reset_site_folder():
     if SITE_DIR.exists():
@@ -25,23 +23,77 @@ def reset_site_folder():
 
 
 def copy_figures():
+    if not FIGURES_DIR.exists():
+        print("Warning: reports/figures folder does not exist.")
+        return
+
     for figure_path in FIGURES_DIR.glob("*.png"):
         shutil.copy(figure_path, SITE_FIGURES_DIR / figure_path.name)
 
 
-def build_html_page():
-    if not SUMMARY_PATH.exists():
-        raise FileNotFoundError(f"Summary file not found: {SUMMARY_PATH}")
+def read_csv_if_exists(path):
+    if path.exists():
+        return pd.read_csv(path)
+    return None
 
-    summary_df = pd.read_csv(SUMMARY_PATH)
 
-    summary_table_html = summary_df.to_html(
+def dataframe_to_html(df):
+    if df is None or df.empty:
+        return "<p class='warning'>Data not available.</p>"
+
+    return df.to_html(
         index=False,
-        classes="summary-table",
+        classes="data-table",
         border=0
     )
 
+
+def chart_html(title, filename, description):
+    figure_path = FIGURES_DIR / filename
+
+    if not figure_path.exists():
+        return f"""
+        <section>
+            <h2>{title}</h2>
+            <p class="warning">Chart not available: {filename}</p>
+        </section>
+        """
+
+    return f"""
+    <section>
+        <h2>{title}</h2>
+        <p class="section-note">{description}</p>
+        <img src="figures/{filename}" alt="{title}">
+    </section>
+    """
+
+
+def build_html_page():
     updated_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    ticker_summary_path = REPORTS_DIR / "ticker_summary.csv"
+    model_results_path = REPORTS_DIR / "factor_timesfm_model_results.csv"
+    feature_importance_path = REPORTS_DIR / "factor_timesfm_feature_importance.csv"
+
+    ticker_summary = read_csv_if_exists(ticker_summary_path)
+    model_results = read_csv_if_exists(model_results_path)
+    feature_importance = read_csv_if_exists(feature_importance_path)
+
+    if model_results is not None and not model_results.empty:
+        model_results = model_results.sort_values(
+            ["directional_accuracy", "mae"],
+            ascending=[False, True]
+        )
+
+    if feature_importance is not None and not feature_importance.empty:
+        feature_importance = feature_importance.sort_values(
+            "importance",
+            ascending=False
+        ).head(15)
+
+    ticker_summary_html = dataframe_to_html(ticker_summary)
+    model_results_html = dataframe_to_html(model_results)
+    feature_importance_html = dataframe_to_html(feature_importance)
 
     html = f"""
 <!DOCTYPE html>
@@ -49,6 +101,7 @@ def build_html_page():
 <head>
     <meta charset="UTF-8">
     <title>ETL Stocks Dashboard</title>
+
     <style>
         body {{
             font-family: Arial, sans-serif;
@@ -71,14 +124,19 @@ def build_html_page():
         }}
 
         h2 {{
-            margin-top: 40px;
+            margin-top: 42px;
             border-bottom: 2px solid #d0d7de;
             padding-bottom: 8px;
+        }}
+
+        h3 {{
+            margin-top: 28px;
         }}
 
         .subtitle {{
             color: #57606a;
             margin-bottom: 24px;
+            font-size: 16px;
         }}
 
         .badge {{
@@ -89,28 +147,42 @@ def build_html_page():
             border-radius: 6px;
             font-size: 14px;
             margin-right: 6px;
+            margin-bottom: 6px;
         }}
 
-        .summary-table {{
+        .highlight-box {{
+            background-color: #f6f8fa;
+            border-left: 5px solid #0969da;
+            padding: 16px;
+            margin-top: 18px;
+            border-radius: 6px;
+        }}
+
+        .warning {{
+            color: #bf8700;
+            font-weight: bold;
+        }}
+
+        .data-table {{
             border-collapse: collapse;
             width: 100%;
             margin-top: 16px;
             font-size: 14px;
         }}
 
-        .summary-table th {{
+        .data-table th {{
             background-color: #24292f;
             color: white;
             padding: 10px;
             text-align: left;
         }}
 
-        .summary-table td {{
+        .data-table td {{
             padding: 10px;
             border-bottom: 1px solid #d0d7de;
         }}
 
-        .summary-table tr:nth-child(even) {{
+        .data-table tr:nth-child(even) {{
             background-color: #f6f8fa;
         }}
 
@@ -121,73 +193,160 @@ def build_html_page():
             margin-top: 16px;
         }}
 
-        .footer {{
-            margin-top: 40px;
-            color: #57606a;
-            font-size: 14px;
-        }}
-
         .section-note {{
             color: #57606a;
         }}
+
+        .footer {{
+            margin-top: 44px;
+            color: #57606a;
+            font-size: 14px;
+            border-top: 1px solid #d0d7de;
+            padding-top: 16px;
+        }}
+
+        code {{
+            background-color: #f6f8fa;
+            padding: 2px 5px;
+            border-radius: 4px;
+        }}
+
+        ul {{
+            line-height: 1.6;
+        }}
     </style>
 </head>
+
 <body>
     <div class="container">
-        <h1>ETL_STOCKS: Energy Stock Market Dashboard</h1>
+        <h1>ETL_STOCKS: Energy Stock ETL, Forecasting, and Model Comparison</h1>
+
         <p class="subtitle">
-            Automated ETL pipeline report generated from Python, SQLite, Pandas, Matplotlib, and GitHub Actions.
+            Automated financial data pipeline using Python, SQLite, TimesFM, machine learning, GitHub Actions, and GitHub Pages.
         </p>
 
         <p>
             <span class="badge">ETL</span>
             <span class="badge">SQLite</span>
+            <span class="badge">TimesFM</span>
+            <span class="badge">Machine Learning</span>
             <span class="badge">GitHub Actions</span>
             <span class="badge">GitHub Pages</span>
         </p>
 
-        <h2>Project Overview</h2>
-        <p>
-            This dashboard tracks selected energy stocks including XOM, CVX, and OXY.
-            The pipeline extracts historical market data, transforms it into analysis-ready format,
-            loads the data into a SQLite database, and generates financial summary reports and charts.
-        </p>
+        <section>
+            <h2>Project Summary</h2>
+            <p>
+                This project builds an end-to-end ETL and forecasting pipeline for major U.S. energy stocks:
+                <strong>XOM</strong>, <strong>CVX</strong>, and <strong>OXY</strong>.
+                It extracts stock market data, engineers financial features, runs TimesFM rolling backtests,
+                and compares factor-only, TimesFM-only, and factor-plus-TimesFM machine learning models.
+            </p>
 
-        <h2>Summary Table</h2>
-        <p class="section-note">
-            This table summarizes stock performance, daily return, volatility, volume, and total return.
-        </p>
-        {summary_table_html}
+            <div class="highlight-box">
+                <strong>Current finding:</strong>
+                Factor-only tree-based models showed the strongest directional accuracy in the current test window.
+                TimesFM forecast features did not improve performance over the factor-only models in the current setup.
+            </div>
+        </section>
 
-        <h2>Close Price Trend</h2>
-        <p class="section-note">
-            Historical close price trend for each selected energy stock.
-        </p>
-        <img src="figures/close_price_trend.png" alt="Close Price Trend">
+        <section>
+            <h2>Pipeline Architecture</h2>
+            <p class="section-note">
+                The project follows a modular financial data workflow.
+            </p>
 
-        <h2>Normalized Price Trend</h2>
-        <p class="section-note">
-            Each stock starts at 100, allowing relative performance comparison.
-        </p>
-        <img src="figures/normalized_price_trend.png" alt="Normalized Price Trend">
+            <ul>
+                <li><strong>Extract:</strong> Download stock and market factor data using yfinance.</li>
+                <li><strong>Transform:</strong> Clean data and engineer technical and market features.</li>
+                <li><strong>Load:</strong> Store processed data in SQLite.</li>
+                <li><strong>Forecast:</strong> Run TimesFM rolling backtest using historical close prices.</li>
+                <li><strong>Model:</strong> Compare factor-only, TimesFM-only, and factor-plus-TimesFM models.</li>
+                <li><strong>Publish:</strong> Generate static dashboard and deploy with GitHub Pages.</li>
+            </ul>
+        </section>
 
-        <h2>Daily Return Distribution</h2>
-        <p class="section-note">
-            Distribution of daily returns, useful for comparing volatility and risk.
-        </p>
-        <img src="figures/daily_return_distribution.png" alt="Daily Return Distribution">
+        <section>
+            <h2>Stock Summary</h2>
+            <p class="section-note">
+                Summary statistics for the selected energy stocks.
+            </p>
+            {ticker_summary_html}
+        </section>
 
-        <h2>中文说明</h2>
-        <p>
-            这个网页是由 GitHub Actions 自动生成的能源股票 ETL 报表。
-            Pipeline 会自动抓取 XOM、CVX、OXY 的历史股票数据，清洗后写入 SQLite 数据库，
-            并生成 summary table 和可视化图表。
-        </p>
+        {chart_html(
+            "Close Price Trend",
+            "close_price_trend.png",
+            "Historical close price trend for XOM, CVX, and OXY."
+        )}
 
-        <p>
-            这个项目展示了端到端数据工程流程：
-            数据提取、数据清洗、数据库加载、SQL 验证、报表生成和静态网页部署。
-        </p>
+        {chart_html(
+            "Normalized Price Trend",
+            "normalized_price_trend.png",
+            "Each stock starts at 100, allowing relative performance comparison."
+        )}
+
+        {chart_html(
+            "Daily Return Distribution",
+            "daily_return_distribution.png",
+            "Distribution of daily returns across selected energy stocks."
+        )}
+
+        <section>
+            <h2>Final Model Comparison</h2>
+            <p class="section-note">
+                Models were evaluated by MAE, RMSE, and directional accuracy.
+                The baseline assumes zero future return.
+            </p>
+            {model_results_html}
+        </section>
+
+        {chart_html(
+            "Model Comparison by MAE",
+            "factor_timesfm_model_comparison_mae.png",
+            "Lower MAE indicates better return prediction accuracy."
+        )}
+
+        {chart_html(
+            "Model Comparison by Directional Accuracy",
+            "factor_timesfm_model_comparison_direction.png",
+            "Directional accuracy measures whether the model correctly predicts up or down movement."
+        )}
+
+        <section>
+            <h2>Feature Importance</h2>
+            <p class="section-note">
+                Top features from the factor-plus-TimesFM random forest model.
+            </p>
+            {feature_importance_html}
+        </section>
+
+        {chart_html(
+            "Factor + TimesFM Feature Importance",
+            "factor_timesfm_feature_importance.png",
+            "Feature importance from the random forest model using market factors and TimesFM forecast features."
+        )}
+
+        <section>
+            <h2>中文说明</h2>
+            <p>
+                这个项目是一个能源股票 ETL、预测和模型比较项目。项目会自动抓取 XOM、CVX、OXY 的历史股票数据，
+                构建 WTI、SPY、XLE、VIX 等市场因子，并使用 TimesFM 进行 rolling backtest。
+            </p>
+
+            <p>
+                当前结果显示，factor-only 的树模型在方向预测上表现最好；TimesFM 特征在当前设置下没有明显提升模型表现。
+                这说明短期股票收益率非常 noisy，必须通过 baseline 和 backtest 进行真实评估。
+            </p>
+        </section>
+
+        <section>
+            <h2>Disclaimer</h2>
+            <p>
+                This project is for educational and portfolio purposes only.
+                It is not financial advice and should not be used as a trading system.
+            </p>
+        </section>
 
         <div class="footer">
             Last updated: {updated_time}
