@@ -1,32 +1,40 @@
-# ETL_STOCKS: Energy Stock Market ETL Pipeline
-
-## English Version
+# ETL_STOCKS: Energy Stock ETL, Forecasting, and Model Comparison
 
 ## Project Overview
 
-**ETL_STOCKS** is a Python-based ETL pipeline designed to collect, clean, store, and analyze historical energy stock market data. The project extracts stock price data for major energy companies, transforms raw market data into analysis-ready datasets, loads the processed data into a SQLite database, and generates summary reports and visualizations for financial analysis.
+**ETL_STOCKS** is an end-to-end financial data engineering and forecasting project focused on major U.S. energy stocks. The project builds an automated ETL pipeline, stores structured market data in SQLite, generates analytical reports, applies Google Research's TimesFM model for time-series forecasting, and compares traditional market-factor models against TimesFM-enhanced machine learning models.
 
-This project demonstrates a complete end-to-end data workflow, including data extraction, data transformation, database loading, SQL validation, and automated report generation.
+The project is designed as a lightweight but complete data pipeline:
+
+```text
+Extract market data
+        ↓
+Transform and engineer features
+        ↓
+Load data into SQLite
+        ↓
+Generate reports and charts
+        ↓
+Run TimesFM rolling backtest
+        ↓
+Merge TimesFM forecasts with market factors
+        ↓
+Compare ML models
+        ↓
+Publish dashboard through GitHub Pages
+```
+
+Live dashboard:
+
+```text
+https://jesstank.github.io/etl_stocks/
+```
 
 ---
 
-## Business Objective
+## Stocks Covered
 
-Energy companies are strongly affected by market volatility, commodity prices, investor sentiment, and macroeconomic conditions. This project focuses on analyzing the historical performance of selected energy stocks and answering questions such as:
-
-* How have major energy stocks performed over time?
-* Which stock had the highest total return during the selected period?
-* Which stock showed the highest volatility?
-* How do normalized stock prices compare across companies?
-* What does the daily return distribution reveal about risk?
-
-The goal is to build a lightweight but professional ETL pipeline that converts raw financial data into structured insights.
-
----
-
-## Stocks Analyzed
-
-The current version analyzes the following major energy companies:
+The current version focuses on three major energy stocks:
 
 | Ticker | Company                          |
 | ------ | -------------------------------- |
@@ -36,76 +44,253 @@ The current version analyzes the following major energy companies:
 
 ---
 
-## Tech Stack
+## Data Sources
 
-* **Python** — main programming language
-* **Pandas** — data cleaning, transformation, and analysis
-* **yfinance** — stock market data extraction
-* **SQLite** — lightweight relational database
-* **Matplotlib** — data visualization
-* **VS Code** — development environment
-* **Conda** — Python environment management
+The project uses `yfinance` to collect historical market data.
 
----
-
-## ETL Pipeline Design
-
-### 1. Extract
-
-The pipeline extracts historical stock data from Yahoo Finance using the `yfinance` package.
-
-Extracted fields include:
-
-* Date
-* Open price
-* High price
-* Low price
-* Close price
-* Adjusted close price
-* Trading volume
-* Stock ticker
-
-Raw data is saved into the `data/raw/` folder.
-
----
-
-### 2. Transform
-
-The transformation step cleans and prepares the data for analysis.
-
-Main transformation tasks include:
-
-* Standardizing date format
-* Sorting records by ticker and date
-* Converting numeric columns
-* Removing missing values
-* Calculating daily return
-* Calculating 7-day moving average
-* Calculating 30-day moving average
-
-The cleaned dataset is saved into:
+Main stock data:
 
 ```text
-data/processed/stock_prices_processed.csv
+XOM
+CVX
+OXY
 ```
+
+External market factors:
+
+| Factor                | Ticker | Meaning                        |
+| --------------------- | ------ | ------------------------------ |
+| WTI crude oil futures | CL=F   | Crude oil price proxy          |
+| S&P 500 ETF           | SPY    | Broad U.S. market proxy        |
+| Energy sector ETF     | XLE    | Energy sector proxy            |
+| VIX index             | ^VIX   | Market volatility / fear index |
 
 ---
 
-### 3. Load
+## Main Components
 
-The processed dataset is loaded into a SQLite database:
+## 1. ETL Pipeline
+
+The ETL pipeline extracts historical stock data, cleans the data, calculates returns and moving averages, and stores the processed results in a SQLite database.
+
+Main script:
+
+```text
+scripts/main.py
+```
+
+Generated database:
 
 ```text
 data/etl_stocks.db
 ```
 
-The main database table is:
+Main SQLite table:
 
 ```text
 stock_prices
 ```
 
-This allows the data to be queried using SQL and reused for further analysis.
+---
+
+## 2. Analysis Reports
+
+The project generates basic market analysis outputs, including:
+
+```text
+reports/ticker_summary.csv
+reports/figures/close_price_trend.png
+reports/figures/normalized_price_trend.png
+reports/figures/daily_return_distribution.png
+```
+
+Main script:
+
+```text
+scripts/analyze_db.py
+```
+
+---
+
+## 3. Feature Engineering
+
+The project builds a machine learning feature table using stock-level technical features and external market factors.
+
+Main script:
+
+```text
+scripts/build_features.py
+```
+
+Feature groups include:
+
+```text
+stock_return_1d
+volume_change_1d
+close_to_ma7
+close_to_ma30
+volatility_7d
+volatility_30d
+wti_return_1d
+spy_return_1d
+xle_return_1d
+vix_return_1d
+```
+
+Output:
+
+```text
+data/processed/ml_features.csv
+```
+
+---
+
+## 4. TimesFM Rolling Backtest
+
+The project uses Google Research's TimesFM model as a zero-shot time-series forecasting model.
+
+In this project, TimesFM is used as a univariate forecasting model:
+
+```text
+Input: recent historical close prices
+Output: future close price forecast
+```
+
+The rolling backtest simulates historical prediction dates. For each prediction date, the model only sees data available up to that point, forecasts the next 5 business days, and compares the forecast with actual future prices.
+
+Main script:
+
+```text
+scripts/backtest_timesfm.py
+```
+
+Backtest output:
+
+```text
+reports/forecast/timesfm_backtest.csv
+reports/forecast/timesfm_backtest_metrics.csv
+```
+
+---
+
+## 5. Factor + TimesFM Feature Merge
+
+TimesFM forecasts are converted into machine learning features and merged with regular market factors.
+
+Main script:
+
+```text
+scripts/merge_timesfm_features.py
+```
+
+Merged output:
+
+```text
+data/processed/ml_features_with_timesfm.csv
+```
+
+TimesFM features include:
+
+```text
+timesfm_pred_return_step1
+timesfm_pred_return_step2
+timesfm_pred_return_step3
+timesfm_pred_return_step4
+timesfm_pred_return_step5
+timesfm_direction_step1
+timesfm_direction_step2
+timesfm_direction_step3
+timesfm_direction_step4
+timesfm_direction_step5
+timesfm_pred_return_slope_1_to_5
+```
+
+---
+
+## 6. Model Comparison
+
+The final modeling step compares three feature settings:
+
+```text
+1. factor_only
+2. timesfm_only
+3. factor_plus_timesfm
+```
+
+Models tested:
+
+```text
+Linear Regression
+Random Forest
+Gradient Boosting
+Zero-return baseline
+```
+
+Main script:
+
+```text
+scripts/train_factor_timesfm_model.py
+```
+
+Final result files:
+
+```text
+reports/factor_timesfm_model_results.csv
+reports/factor_timesfm_feature_importance.csv
+reports/figures/factor_timesfm_model_comparison_mae.png
+reports/figures/factor_timesfm_model_comparison_direction.png
+reports/figures/factor_timesfm_feature_importance.png
+```
+
+---
+
+## Current Findings
+
+The current test results show that:
+
+```text
+Factor-only tree-based models achieved the best directional accuracy.
+TimesFM-only features did not consistently outperform the baseline.
+Adding TimesFM features did not improve the factor-only model in the current setup.
+The zero-return baseline remained strong in MAE because next-day stock returns are noisy and often close to zero.
+```
+
+In the latest model comparison, the strongest directional results came from:
+
+```text
+factor_only + random_forest
+factor_only + gradient_boosting
+```
+
+Both reached approximately:
+
+```text
+58.33% directional accuracy
+```
+
+However, no model consistently outperformed the zero-return baseline in MAE.
+
+This suggests that short-term next-day stock return prediction remains highly noisy. TimesFM may still be useful as a forecasting component, but in the current setup, its forecast features did not provide a stable improvement over traditional factor-only models.
+
+---
+
+## Important Interpretation
+
+This project should not be interpreted as an investment recommendation system.
+
+The goal is not to claim that the model can reliably predict stock prices. Instead, the goal is to build a realistic financial data pipeline and evaluate whether different forecasting approaches provide measurable predictive value.
+
+The current result is valuable because it shows a disciplined modeling process:
+
+```text
+Build ETL pipeline
+Create features
+Run TimesFM forecast
+Backtest predictions
+Compare models
+Evaluate against baseline
+Report honest results
+```
 
 ---
 
@@ -114,470 +299,247 @@ This allows the data to be queried using SQL and reused for further analysis.
 ```text
 ETL_STOCKS/
 │
+├── .github/
+│   └── workflows/
+│       └── etl.yml
+│
 ├── data/
 │   ├── raw/
-│   │   ├── XOM_raw.csv
-│   │   ├── CVX_raw.csv
-│   │   └── OXY_raw.csv
-│   │
 │   ├── processed/
-│   │   └── stock_prices_processed.csv
-│   │
 │   └── etl_stocks.db
 │
 ├── reports/
-│   ├── ticker_summary.csv
+│   ├── factor_timesfm_model_results.csv
+│   ├── factor_timesfm_feature_importance.csv
 │   │
 │   └── figures/
 │       ├── close_price_trend.png
 │       ├── normalized_price_trend.png
-│       └── daily_return_distribution.png
+│       ├── daily_return_distribution.png
+│       ├── factor_timesfm_model_comparison_mae.png
+│       ├── factor_timesfm_model_comparison_direction.png
+│       └── factor_timesfm_feature_importance.png
 │
 ├── scripts/
 │   ├── main.py
 │   ├── check_db.py
-│   └── analyze_db.py
+│   ├── analyze_db.py
+│   ├── build_site.py
+│   ├── build_features.py
+│   ├── backtest_timesfm.py
+│   ├── merge_timesfm_features.py
+│   └── train_factor_timesfm_model.py
 │
 ├── requirements.txt
+├── requirements-timesfm.txt
+├── .gitignore
 └── README.md
 ```
 
 ---
 
-## How to Run the Project
+## Installation
 
-### 1. Activate the Conda Environment
+## Basic ETL Environment
+
+For the basic ETL and dashboard pipeline:
 
 ```bash
+conda create -n etl-env python=3.11 -y
 conda activate etl-env
-```
-
-### 2. Install Required Packages
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run the ETL Pipeline
+## TimesFM / ML Environment
+
+For TimesFM forecasting and model comparison:
+
+```bash
+conda create -n timesfm-env python=3.11 -y
+conda activate timesfm-env
+pip install -r requirements-timesfm.txt
+```
+
+Recommended `requirements-timesfm.txt`:
+
+```text
+numpy
+pandas
+matplotlib
+yfinance
+scikit-learn
+torch
+timesfm[torch]
+```
+
+---
+
+## How to Run
+
+## 1. Run ETL Pipeline
 
 ```bash
 python scripts/main.py
 ```
 
-This will extract raw stock data, transform it, and load the processed dataset into SQLite.
-
-### 4. Validate the Database
+## 2. Validate SQLite Database
 
 ```bash
 python scripts/check_db.py
 ```
 
-This script checks whether the SQLite database exists, lists available tables, prints the table schema, and displays sample rows.
-
-### 5. Generate Analysis Reports and Visualizations
+## 3. Generate Basic Reports
 
 ```bash
 python scripts/analyze_db.py
 ```
 
-This will generate summary reports and charts under the `reports/` folder.
+## 4. Build Market Factor Features
 
----
-
-## Output Files
-
-### Processed Dataset
-
-```text
-data/processed/stock_prices_processed.csv
+```bash
+python scripts/build_features.py
 ```
 
-### SQLite Database
+## 5. Run TimesFM Rolling Backtest
 
-```text
-data/etl_stocks.db
+```bash
+python scripts/backtest_timesfm.py
 ```
 
-### Summary Report
+## 6. Merge TimesFM Forecasts into ML Features
 
-```text
-reports/ticker_summary.csv
+```bash
+python scripts/merge_timesfm_features.py
 ```
 
-### Visualizations
+## 7. Train and Compare Models
 
-```text
-reports/figures/close_price_trend.png
-reports/figures/normalized_price_trend.png
-reports/figures/daily_return_distribution.png
+```bash
+python scripts/train_factor_timesfm_model.py
+```
+
+## 8. Build GitHub Pages Site
+
+```bash
+python scripts/build_site.py
 ```
 
 ---
 
-## Analysis Features
+## GitHub Actions and GitHub Pages
 
-The project generates the following analytical outputs:
+The project includes a GitHub Actions workflow that can run the ETL pipeline and deploy a static dashboard to GitHub Pages.
 
-### Stock Performance Summary
+Workflow file:
 
-The summary report includes:
+```text
+.github/workflows/etl.yml
+```
 
-* Row count
-* Start date
-* End date
-* Starting close price
-* Ending close price
-* Minimum close price
-* Maximum close price
-* Average daily return
-* Volatility
-* Average trading volume
-* Total return
+GitHub Pages dashboard:
 
-### Close Price Trend
-
-This chart shows the historical close price trend of each stock.
-
-### Normalized Price Trend
-
-This chart normalizes each stock’s starting price to 100, allowing a fair comparison of relative performance.
-
-### Daily Return Distribution
-
-This chart shows the distribution of daily returns, which helps compare volatility and risk across stocks.
+```text
+https://jesstank.github.io/etl_stocks/
+```
 
 ---
 
-## What This Project Demonstrates
+## Final Model Results
 
-This project demonstrates practical data engineering and analytics skills, including:
+The final comparison table is stored in:
 
-* Building an end-to-end ETL pipeline
-* Extracting data from financial APIs
-* Cleaning and transforming time-series data
-* Loading structured data into a relational database
-* Validating database tables with SQL
-* Creating reusable Python scripts
-* Generating automated analytical reports
-* Producing visualizations for financial interpretation
-* Organizing a data project using a professional folder structure
+```text
+reports/factor_timesfm_model_results.csv
+```
 
----
+The main comparison charts are stored in:
 
-## Future Improvements
-
-Potential future upgrades include:
-
-* Add WTI crude oil price data
-* Analyze correlation between crude oil prices and energy stocks
-* Add GitHub Actions for scheduled automatic ETL runs
-* Add data quality checks
-* Store results in PostgreSQL
-* Build an interactive dashboard with Streamlit or Tableau
-* Add unit tests for ETL functions
-* Add logging and error handling
-* Deploy the pipeline as a scheduled cloud workflow
+```text
+reports/figures/factor_timesfm_model_comparison_mae.png
+reports/figures/factor_timesfm_model_comparison_direction.png
+reports/figures/factor_timesfm_feature_importance.png
+```
 
 ---
 
-## Resume Description
+## Key Takeaways
 
-**Energy Stock Market ETL Pipeline**
-
-Built an end-to-end ETL pipeline using Python, Pandas, yfinance, and SQLite to extract, clean, store, and analyze historical energy stock market data. Created reusable scripts for data extraction, transformation, database validation, and report generation. Produced summary reports and visualizations to compare stock performance, daily returns, volatility, and normalized price trends across major energy companies.
+1. A complete ETL pipeline was built for energy stock market data.
+2. Market factors such as WTI, SPY, XLE, VIX, volume, moving-average distance, and volatility were engineered.
+3. TimesFM was tested as a zero-shot univariate forecasting model.
+4. TimesFM rolling forecasts were converted into ML features.
+5. Factor-only tree models showed the best directional accuracy in the current test window.
+6. TimesFM features did not improve model performance in the current setup.
+7. Short-term next-day stock return forecasting remains highly noisy and difficult.
+8. Honest baseline comparison is essential for financial forecasting projects.
 
 ---
 
-# 中文版本
+# 中文说明
 
 ## 项目概述
 
-**ETL_STOCKS** 是一个基于 Python 的能源股票市场 ETL 项目。该项目可以自动抓取主要能源公司的历史股票数据，对原始数据进行清洗和转换，并将处理后的数据加载到 SQLite 数据库中，最后生成分析报告和可视化图表。
+**ETL_STOCKS** 是一个能源股票 ETL、预测和模型比较项目。项目使用 Python 自动抓取能源股票和市场因子数据，清洗后存入 SQLite 数据库，并结合 Google Research 的 TimesFM 模型和传统机器学习模型进行预测实验。
 
-这个项目展示了一个完整的数据分析工作流：
+本项目的重点不是声称可以准确预测股价，而是展示一个完整、真实、可复现的金融数据工程和建模流程。
+
+---
+
+## 项目流程
 
 ```text
-数据提取 → 数据清洗 → 数据转换 → 数据库存储 → SQL 验证 → 报告和图表生成
+抓取股票数据
+        ↓
+清洗数据
+        ↓
+写入 SQLite
+        ↓
+构建市场因子
+        ↓
+运行 TimesFM rolling backtest
+        ↓
+将 TimesFM 预测结果转成 ML feature
+        ↓
+比较 factor-only、TimesFM-only、factor+TimesFM 模型
+        ↓
+通过 GitHub Pages 展示结果
 ```
 
-它不是一个简单的 Notebook，而是一个结构完整、可以复现、可以扩展的 ETL Pipeline 项目。
-
 ---
 
-## 项目目标
+## 当前结论
 
-能源公司的股票价格会受到油价、宏观经济、市场情绪和行业周期的影响。本项目通过分析能源股票的历史价格数据，尝试回答以下问题：
-
-* 主要能源股票的历史走势如何？
-* 哪只股票在分析期间表现最好？
-* 哪只股票波动最大？
-* 如果把起点都设为 100，不同股票的相对表现如何？
-* 每日收益率分布能反映出什么风险特征？
-
-项目目标是将原始金融数据转换成结构化、可查询、可分析的数据资产。
-
----
-
-## 当前分析股票
-
-| Ticker | 公司                               |
-| ------ | -------------------------------- |
-| XOM    | Exxon Mobil Corporation          |
-| CVX    | Chevron Corporation              |
-| OXY    | Occidental Petroleum Corporation |
-
----
-
-## 技术栈
-
-* **Python**：主要开发语言
-* **Pandas**：数据清洗、转换和分析
-* **yfinance**：获取股票市场数据
-* **SQLite**：轻量级关系型数据库
-* **Matplotlib**：数据可视化
-* **VS Code**：代码开发环境
-* **Conda**：Python 环境管理
-
----
-
-## ETL 流程设计
-
-### 1. Extract：数据提取
-
-项目使用 `yfinance` 从 Yahoo Finance 抓取历史股票数据。
-
-抓取字段包括：
-
-* 日期
-* 开盘价
-* 最高价
-* 最低价
-* 收盘价
-* 复权收盘价
-* 成交量
-* 股票代码
-
-原始数据会保存到：
+当前模型结果显示：
 
 ```text
-data/raw/
+factor-only 的 Random Forest 和 Gradient Boosting 方向预测表现最好
+TimesFM-only 模型没有稳定超过 baseline
+factor + TimesFM 没有比 factor-only 更好
+zero-return baseline 在 MAE 上仍然很强
 ```
+
+这说明短期 next-day stock return 非常 noisy，仅靠当前这些特征很难稳定预测。
+
+这个结果本身是有价值的，因为项目没有硬吹模型，而是通过 baseline、backtest 和 model comparison 做了真实评估。
 
 ---
 
-### 2. Transform：数据转换
-
-转换阶段会将原始股票数据清洗成适合分析的格式。
-
-主要处理步骤包括：
-
-* 标准化日期格式
-* 按股票代码和日期排序
-* 转换数值字段
-* 删除缺失值
-* 计算每日收益率
-* 计算 7 日移动平均线
-* 计算 30 日移动平均线
-
-处理后的数据会保存到：
+## 项目亮点
 
 ```text
-data/processed/stock_prices_processed.csv
+Python ETL
+SQLite database
+Financial feature engineering
+TimesFM rolling backtest
+Market factor modeling
+Model comparison
+GitHub Actions
+GitHub Pages dashboard
+Honest baseline evaluation
 ```
 
 ---
 
-### 3. Load：数据加载
+## Disclaimer
 
-清洗后的数据会被加载到 SQLite 数据库：
-
-```text
-data/etl_stocks.db
-```
-
-核心数据表为：
-
-```text
-stock_prices
-```
-
-这样数据就可以通过 SQL 查询，并支持后续分析和报表生成。
-
----
-
-## 项目结构
-
-```text
-ETL_STOCKS/
-│
-├── data/
-│   ├── raw/
-│   │   ├── XOM_raw.csv
-│   │   ├── CVX_raw.csv
-│   │   └── OXY_raw.csv
-│   │
-│   ├── processed/
-│   │   └── stock_prices_processed.csv
-│   │
-│   └── etl_stocks.db
-│
-├── reports/
-│   ├── ticker_summary.csv
-│   │
-│   └── figures/
-│       ├── close_price_trend.png
-│       ├── normalized_price_trend.png
-│       └── daily_return_distribution.png
-│
-├── scripts/
-│   ├── main.py
-│   ├── check_db.py
-│   └── analyze_db.py
-│
-├── requirements.txt
-└── README.md
-```
-
----
-
-## 如何运行项目
-
-### 1. 激活 Conda 环境
-
-```bash
-conda activate etl-env
-```
-
-### 2. 安装依赖包
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. 运行 ETL Pipeline
-
-```bash
-python scripts/main.py
-```
-
-该脚本会完成数据提取、数据转换和数据库加载。
-
-### 4. 检查 SQLite 数据库
-
-```bash
-python scripts/check_db.py
-```
-
-该脚本会检查数据库文件是否存在、数据库中有哪些表、表结构是否正确，以及数据是否成功写入。
-
-### 5. 生成分析报告和图表
-
-```bash
-python scripts/analyze_db.py
-```
-
-该脚本会在 `reports/` 文件夹中生成 summary report 和图表。
-
----
-
-## 输出结果
-
-### 处理后的数据
-
-```text
-data/processed/stock_prices_processed.csv
-```
-
-### SQLite 数据库
-
-```text
-data/etl_stocks.db
-```
-
-### 汇总报告
-
-```text
-reports/ticker_summary.csv
-```
-
-### 可视化图表
-
-```text
-reports/figures/close_price_trend.png
-reports/figures/normalized_price_trend.png
-reports/figures/daily_return_distribution.png
-```
-
----
-
-## 分析内容
-
-项目会自动生成以下分析结果：
-
-### 股票表现汇总
-
-汇总报告包括：
-
-* 数据行数
-* 起始日期
-* 结束日期
-* 起始收盘价
-* 结束收盘价
-* 最低收盘价
-* 最高收盘价
-* 平均每日收益率
-* 波动率
-* 平均成交量
-* 总收益率
-
-### 收盘价趋势图
-
-展示每只股票的历史收盘价走势。
-
-### 标准化价格趋势图
-
-将每只股票的起点都标准化为 100，用于公平比较不同股票的相对表现。
-
-### 每日收益率分布图
-
-展示不同股票每日收益率的分布情况，用于比较波动性和风险。
-
----
-
-## 项目展示能力
-
-这个项目展示了以下数据分析和数据工程能力：
-
-* 构建端到端 ETL Pipeline
-* 使用 API 抽取金融市场数据
-* 清洗和转换时间序列数据
-* 将结构化数据加载到关系型数据库
-* 使用 SQL 验证数据库内容
-* 编写可复用的 Python 脚本
-* 自动生成分析报告
-* 使用图表解释金融数据
-* 按照专业项目结构组织代码和数据
-
----
-
-## 后续改进方向
-
-后续可以继续升级：
-
-* 加入 WTI 原油价格数据
-* 分析原油价格与能源股票之间的相关性
-* 使用 GitHub Actions 实现定时自动运行
-* 添加数据质量检查
-* 将 SQLite 升级为 PostgreSQL
-* 使用 Streamlit 或 Tableau 制作交互式 Dashboard
-* 为 ETL 函数添加单元测试
-* 添加日志和错误处理
-* 将 Pipeline 部署为云端定时任务
-
----
-
-## 简历描述
-
-**能源股票市场 ETL Pipeline 项目**
-
-使用 Python、Pandas、yfinance 和 SQLite 构建了一个端到端 ETL Pipeline，用于自动抓取、清洗、存储和分析能源股票历史市场数据。项目包含数据提取、数据转换、数据库加载、SQL 验证、报告生成和数据可视化模块，并通过 summary report 和图表比较了主要能源公司的股票表现、每日收益率、波动率和标准化价格走势。
+This project is for educational and portfolio purposes only. It is not financial advice and should not be used as a trading system.

@@ -1,5 +1,7 @@
 numpy
 pandas
 matplotlib
+yfinance
+scikit-learn
 torch
 timesfm[torch]
